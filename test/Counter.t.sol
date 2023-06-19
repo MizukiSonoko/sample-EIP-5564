@@ -18,9 +18,11 @@ contract CounterTest is Test {
     }
 
     function testIncrement() view public {
-        bytes memory stealthMetaAddress = "0x3498B6C91680a0079E365e5C43dCa8f9e33aa4a5DB45228dA324fb9A832c2a1C8Edf08D6820Ccc9C";
+        // st:eth:0x<spendingKey><viewingKey>
+        // => EthereumAddress + PrivateKey
+        bytes memory stealthMetaAddress = "0x3498B6C91680a0079E365e5C43dCa8f9e33aa4a53b39fbaa609ba4ebe0db1fee8bb9d78bdb681044ab19418dc819fbb458496b59";
         (address stealthAddress, bytes memory ephemeralPubKey, bytes1 viewTag) = erc5564Messenger.generateStealthAddress(stealthMetaAddress);
-        console.logAddress(stealthAddress);
+        console.log("address %s", stealthAddress);
         console.logBytes(ephemeralPubKey);
         console.logBytes1(viewTag);
     }

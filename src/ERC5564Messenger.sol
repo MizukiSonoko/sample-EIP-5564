@@ -2,9 +2,8 @@
 pragma solidity ^0.8.0;
 
 import "./interfaces/IERC5564Messenger.sol";
-
-import "forge-std/console.sol";
 import "elliptic-curve-solidity/contracts/EllipticCurve.sol";
+import "forge-std/console.sol";
 
 contract ERC5564Messenger is IERC5564Messenger {
 
@@ -19,14 +18,36 @@ contract ERC5564Messenger is IERC5564Messenger {
         0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F;
 
     // Helper function to parse the spending and viewing public keys
-    function parsePublicKey(bytes memory publicKey) internal pure returns (bytes32, bytes32) {
-        bytes32 spendKey;
-        bytes32 viewKey;
+    function parsePublicKey(bytes memory publicKey) internal pure returns (uint256, uint256) {
+        // console.log("publicKey %d", publicKey.length);
+        require(publicKey.length == 64, "Invalid public key length");
+        uint256 x;
+        uint256 y;
         assembly {
-            spendKey := mload(add(publicKey, 32))
-            viewKey := mload(add(publicKey, 64))
+            x := mload(add(4, add(publicKey, 32)))
+            y := mload(add(4, add(publicKey, 64)))
         }
-        return (spendKey, viewKey);
+        return (x, y);
+    }
+
+    // Helper function to parse the spending and viewing public keys
+    function parseStealthMetaAddress(bytes memory stealthMetaAddress) internal pure returns (bytes32, bytes memory) {
+      // console.log("stealthMetaAddress %d", stealthMetaAddress.length);
+      require(stealthMetaAddress.length >= 106, "Input should be at least 128 bytes long");
+      bytes32 first;
+      assembly {
+          first := mload(add(stealthMetaAddress, 32))
+      }
+      bytes memory second = new bytes(64);
+      for (uint i = 0; i < 64; i++) {
+          second[i] = stealthMetaAddress[i+32];
+      }
+      return (first, second);
+    }
+    
+    function derivePublicKey(bytes32 privateKey) internal pure returns (bytes memory) {
+      (uint256 gx, uint256 gy) = EllipticCurve.ecMul(uint256(privateKey), SECP256K1_GX, SECP256K1_GY, SECP256K1_A, SECP256K1_PP);
+      return abi.encodePacked(gx, gy);
     }
 
     /// @notice Generates a stealth address from a stealth meta address.
@@ -43,16 +64,17 @@ contract ERC5564Messenger is IERC5564Messenger {
       //    Generate a random 32-byte entropy ephemeral private key p_ephemeral.
       bytes32 p_ephemeral = bytes32(keccak256(abi.encodePacked(block.timestamp, block.difficulty, msg.sender)));
       //    Derive the ephemeral public P_ephemeral key from p_ephemeral.
-      (uint256 gx, uint256 gy) = EllipticCurve.ecMul(uint256(p_ephemeral), SECP256K1_GX, SECP256K1_GY, SECP256K1_A, SECP256K1_PP);
-      ephemeralPubKey = abi.encodePacked(gx, gy);
+      //    P_ephemeral = p_ephemeral * G
+      ephemeralPubKey = derivePublicKey(p_ephemeral);
 
       //    Parse the spending and viewing public keys, P_spend and P_view, from the stealth meta-address.
-      (bytes32 P_spend, bytes32 P_view) = parsePublicKey(stealthMetaAddress);
+      (bytes32 P_spend, bytes memory P_view) = parseStealthMetaAddress(stealthMetaAddress);
 
-      console.logUint(uint256(p_ephemeral));
-      console.logUint(uint256(P_view));
       //    A shared secret s is computed as p_ephemeral * P_view.
-      (uint256 sx, uint256 sy) = EllipticCurve.ecMul(uint256(p_ephemeral), gx, gy, SECP256K1_A, SECP256K1_PP);
+      //    - Parse public key to (x,y)
+      //    - S = p_ephemeral * (x,y)
+      (uint256 vx, uint256 vy) = parsePublicKey(abi.encodePacked(P_view));
+      (uint256 sx, uint256 sy) = EllipticCurve.ecMul(uint256(p_ephemeral), vx, vy, SECP256K1_A, SECP256K1_PP);
       //    The secret is hashed s_h = h(s).
       bytes32 s_h = keccak256(abi.encodePacked(sx, sy));
       //    The view tag v is extracted by taking the most significant byte s_h[0],
@@ -80,7 +102,24 @@ contract ERC5564Messenger is IERC5564Messenger {
       bytes calldata viewingKey,
       bytes calldata spendingPubKey
     ) external view returns (bool) {
-
+      //    A shared secret s is computed as p_ephemeral * P_view.
+      (ePx, ePy) = parsePublicKey(ephemeralPubKey);
+      (vx, vy) = parsePublicKey(viewingKey);
+      (uint256 Sx, uint256 Sy) = EllipticCurve.ecMul(uint256(s_h), SECP256K1_GX, SECP256K1_GY, SECP256K1_A, SECP256K1_PP);
+      
+      //    The secret is hashed s_h = h(s).
+      bytes32 s_h = keccak256(abi.encodePacked(sx, sy));
+      // The view tag is extracted by taking the most significant byte 
+      //  and can be compared to the given view tag. 
+      // If the view tags do not match, this Announcement is not for the user and the remaining steps can be skipped. If the view tags match, continue on.
+      bytes1 viewTag = bytes1(s_h[0]);
+      //    Multiply the hashed shared secret with the generator point S_h = s_h * G.
+      (uint256 Sx, uint256 Sy) = EllipticCurve.ecMul(uint256(s_h), SECP256K1_GX, SECP256K1_GY, SECP256K1_A, SECP256K1_PP);
+      //    The recipient’s stealth public key is computed as P_stealth = P_spend + S_h.
+      (uint256 P_stealth_x, uint256 P_stealth_y) = EllipticCurve.ecAdd(uint256(P_spend), Sx, uint256(P_spend), Sy, SECP256K1_A, SECP256K1_PP);
+      //    The recipient’s stealth address a_stealth is computed as publicToAddress(P_stealth).
+      address derivedStealthAddress = address(uint160(uint256(keccak256(abi.encodePacked(P_stealth_x, P_stealth_y)))));
+      return derivedStealthAddress == stealthAddress;
     }
     */
 
