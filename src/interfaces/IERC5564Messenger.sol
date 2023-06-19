@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+pragma solidity ^0.5.0;
 
 /// @notice Interface for announcing when something is sent to a stealth address.
 contract IERC5564Messenger {
@@ -38,8 +38,8 @@ contract IERC5564Messenger {
   function announce (
     uint256 schemeId, 
     address stealthAddress, 
-    bytes memory ephemeralPubKey, 
-    bytes memory metadata
+    bytes calldata ephemeralPubKey, 
+    bytes calldata metadata
   )
     external
   {
