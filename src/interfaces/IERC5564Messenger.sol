@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.5.0;
+pragma solidity ^0.8.0;
 
 /// @notice Interface for announcing when something is sent to a stealth address.
 contract IERC5564Messenger {
