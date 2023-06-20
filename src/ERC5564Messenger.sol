@@ -95,7 +95,6 @@ contract ERC5564Messenger is IERC5564Messenger {
     /// @param viewingKey The recipient's viewing private key.
     /// @param spendingPubKey The recipient's spending public key.
     /// @return True if funds sent to the stealth address belong to the recipient.
-    /*
     function checkStealthAddress(
       address stealthAddress,
       bytes calldata ephemeralPubKey,
@@ -103,8 +102,8 @@ contract ERC5564Messenger is IERC5564Messenger {
       bytes calldata spendingPubKey
     ) external view returns (bool) {
       //    A shared secret s is computed as p_ephemeral * P_view.
-      (ePx, ePy) = parsePublicKey(ephemeralPubKey);
-      (vx, vy) = parsePublicKey(viewingKey);
+      (uint256 ePx, uint256 ePy) = parsePublicKey(ephemeralPubKey);
+      (uint256 vx, uint256 vy) = parsePublicKey(viewingKey);
       (uint256 Sx, uint256 Sy) = EllipticCurve.ecMul(uint256(s_h), SECP256K1_GX, SECP256K1_GY, SECP256K1_A, SECP256K1_PP);
       
       //    The secret is hashed s_h = h(s).
@@ -121,7 +120,6 @@ contract ERC5564Messenger is IERC5564Messenger {
       address derivedStealthAddress = address(uint160(uint256(keccak256(abi.encodePacked(P_stealth_x, P_stealth_y)))));
       return derivedStealthAddress == stealthAddress;
     }
-    */
 
     /// @notice Computes the stealth private key for a stealth address.
     /// @param stealthAddress The expected stealth address.
