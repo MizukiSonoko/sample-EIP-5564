@@ -171,10 +171,15 @@ contract ERC5564Messenger is IERC5564Messenger {
     ) external view returns (bytes memory) {
       bytes32 viewingKeyBytes32 = toBytes32(viewingKey);
       (uint256 ePx, uint256 ePy) = parsePublicKey(ephemeralPubKey);
+      // Shared secret s is computed by multiplying the viewing private key 
+      // with the ephemeral public key of the announcement 
+      // s = p_view * P_ephemeral
       (uint256 sx, uint256 sy) = EllipticCurve.ecMul(uint256(viewingKeyBytes32), ePx, ePy, SECP256K1_A, SECP256K1_PP);
-      
+      // The secret is hashed s_h = hash(s)
       bytes32 spendingKeyBytes32 = toBytes32(spendingKey);
-      (uint256 P_stealth_x, uint256 P_stealth_y) = EllipticCurve.ecAdd(uint256(spendingKeyBytes32), sx, sx, sy, SECP256K1_A, SECP256K1_PP);
+      // The stealth private key is computed as p_stealth = p_spend + s_h
+      (uint256 P_stealth_x, uint256 P_stealth_y) = EllipticCurve.ecAdd(
+        uint256(spendingKeyBytes32), sx, uint256(spendingKeyBytes32), sy, SECP256K1_A, SECP256K1_PP);
       return abi.encodePacked(uint256(keccak256(abi.encodePacked(P_stealth_x, P_stealth_y))));
    }
 }
