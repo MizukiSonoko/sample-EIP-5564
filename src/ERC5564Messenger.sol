@@ -127,7 +127,6 @@ contract ERC5564Messenger is IERC5564Messenger {
           |
       142 |       return derivedStealthAddress == stealthAddress;
           |                                       ^^^^^^^^^^^^^^
-
     function checkStealthAddress(
       address stealthAddress,
       bytes calldata ephemeralPubKey,
@@ -153,7 +152,7 @@ contract ERC5564Messenger is IERC5564Messenger {
       address derivedStealthAddress = deriveStealthAddress(spendingPubKeyBytes32, Sx, Sy);
       return derivedStealthAddress == stealthAddress;
     }
-    */
+    */    
 
     /// @notice Computes the stealth private key for a stealth address.
     /// @param stealthAddress The expected stealth address.
